@@ -1,0 +1,72 @@
+# Workflow Plan:
+# 1. Setup: Checkout code and configure Java 21 environment
+# 2. Cache: Enable Maven dependency caching for faster builds
+# 3. Test: Run all unit tests to ensure code quality
+# 4. Build: Compile and package the application (skip tests since already run)
+# 5. Artifacts: Store built JAR and test results for later use
+#
+# Triggers: Push to main/master branches and pull requests
+# Cache Strategy: Maven dependencies cached based on pom.xml hash
+# Artifacts: JAR file and test reports with 30-day retention
+
+name: CI/CD Pipeline
+
+on:
+  # push:
+  #   branches: [ main, master ]
+  # pull_request:
+  #   branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # Step 1: Get the source code from repository
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    # Step 2: Configure Java 21 environment with built-in Maven caching
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'  # OpenJDK distribution for better performance
+        cache: 'maven'  # Enable built-in Maven dependency caching
+        
+    # Step 3: Additional custom caching for Maven repo and build artifacts
+    # - name: Cache Maven dependencies
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: |
+    #       ~/.m2/repository  # Maven local repository
+    #       target/           # Build output directory
+    #     key: ${{ runner.os }}-maven-${{ hashFiles('./pom.xml') }}  # Cache key based on pom.xml changes
+    #     restore-keys: |
+    #       ${{ runner.os }}-maven-  # Fallback cache key
+          
+    # Step 4: Execute all unit tests to validate code functionality
+    - name: Run tests
+      run: ./mvnw test  # Use Maven wrapper to run tests
+      
+    # Step 5: Build the application JAR file (skip tests since already executed)
+    - name: Build application
+      run: ./mvnw clean package -DskipTests  # Clean previous builds and create new JAR
+      
+    # Step 6: Store the built JAR file as a downloadable artifact
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: application-jar
+        path: target/gh-cra-test-*.jar  # Match JAR file pattern
+        retention-days: 30  # Keep artifacts for 30 days
+        
+    # Step 7: Store test results for debugging and analysis (run even if tests fail)
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()  # Always upload test results, even if previous steps fail
+      with:
+        name: test-results
+        path: target/surefire-reports/  # Maven Surefire test reports directory
+        retention-days: 30
